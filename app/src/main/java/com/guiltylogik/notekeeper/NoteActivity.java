@@ -16,6 +16,9 @@ import java.util.List;
 public class NoteActivity extends AppCompatActivity {
 
     public static final String NOTE_POSITION = "com.guiltylogik.notekeeper.NOTE_POSITION";
+    public static final String ORIGINAL_NOTE_COURSE_ID = "com.guiltylogik.notekeeper.ORIGINAL_NOTE_COURSE_ID";
+    public static final String ORIGINAL_NOTE_TITLE = "com.guiltylogik.notekeeper.ORIGINAL_NOTE_TITLE";
+    public static final String ORIGINAL_NOTE_TEXT = "com.guiltylogik.notekeeper.ORIGINAL_NOTE_TEXT";
     private static final int POSITION_NOT_SET = -1;
     private NoteInfo note;
     private boolean mIsNewNote;
@@ -24,6 +27,10 @@ public class NoteActivity extends AppCompatActivity {
     private EditText mNoteText;
     private int mNewNotePosition;
     private boolean mIsCancelling;
+    private ArrayAdapter<CourseInfo> mCoursesAdapter;
+    private String mOriginalNoteId;
+    private String mOriginalNoteTitle;
+    private String mOriginalNoteText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,19 +43,47 @@ public class NoteActivity extends AppCompatActivity {
         mCoursesSpinner = findViewById(R.id.courses_spinner);
 
         List<CourseInfo> courses = DataManager.getInstance().getCourses();
-        ArrayAdapter<CourseInfo> coursesAdapter =
-                new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, courses);
+        mCoursesAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, courses);
 
-        coursesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        mCoursesSpinner.setAdapter(coursesAdapter);
+        mCoursesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mCoursesSpinner.setAdapter(mCoursesAdapter);
 
         readDisplayStateValue();
+
+        if (savedInstanceState == null){
+            saveOrinalNote();
+        }else {
+            resetOriginalNote(savedInstanceState);
+        }
 
         mNoteTitle = findViewById(R.id.title_editText);
         mNoteText = findViewById(R.id.note_text_editText);
         
         if(!mIsNewNote)
             displayNote(mCoursesSpinner, mNoteTitle, mNoteText);
+    }
+
+    private void resetOriginalNote(Bundle savedInstanceState) {
+        mOriginalNoteId = savedInstanceState.getString(ORIGINAL_NOTE_COURSE_ID);
+        mOriginalNoteTitle = savedInstanceState.getString(ORIGINAL_NOTE_TITLE);
+        mOriginalNoteText = savedInstanceState.getString(ORIGINAL_NOTE_TEXT);
+    }
+
+    private void saveOrinalNote() {
+        if (mIsNewNote)
+            return;
+        mOriginalNoteId = note.getCourse().getCourseId();
+        mOriginalNoteTitle = note.getTitle();
+        mOriginalNoteText = note.getText();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+
+        outState.putString(ORIGINAL_NOTE_COURSE_ID, mOriginalNoteId);
+        outState.putString(ORIGINAL_NOTE_TITLE, mOriginalNoteTitle);
+        outState.putString(ORIGINAL_NOTE_TEXT, mOriginalNoteText);
     }
 
     private void displayNote(Spinner coursesSpinner, EditText noteTitle, EditText noteText) {
@@ -79,11 +114,27 @@ public class NoteActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         if(mIsCancelling){
-            if(mIsNewNote)
+            if(mIsNewNote){
                 DataManager.getInstance().removeNote(mNewNotePosition);
+            }else {
+                restoreOriginalNote();
+            }
         } else{
             saveNote();
         }
+    }
+
+    private void restoreOriginalNote() {
+        CourseInfo course = DataManager.getInstance().getCourse(mOriginalNoteId);
+        note.setCourse(course);
+        note.setTitle(mOriginalNoteTitle);
+        note.setText(mOriginalNoteText);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mCoursesAdapter.notifyDataSetChanged();
     }
 
     private void saveNote() {
